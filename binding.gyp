@@ -11,6 +11,11 @@
       "include_dirs": [ "<!(node -e \"require('nan')\")" ]
     },
     {
+      "target_name": "sampling_heap_profiler_wrapper",
+      "sources": [ "bindings/sampling-heap-profiler-wrapper.cc" ],
+      "include_dirs": [ "<!(node -e \"require('nan')\")" ]
+    },
+    {
       "target_name": "statistics",
       "sources": [ "bindings/statistics.cc" ],
       "include_dirs": [ "<!(node -e \"require('nan')\")" ]
