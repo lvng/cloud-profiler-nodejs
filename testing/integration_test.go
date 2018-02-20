@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package integration
+package testing
 
 import (
 	"bytes"
@@ -37,6 +37,8 @@ import (
 )
 
 var (
+	repo   = flag.String("repo", "", "git repo to test")
+	branch = flag.String("branch", "", "git branch to test")
 	commit = flag.String("commit", "", "git commit to test")
 	runID  = time.Now().Unix()
 )
@@ -67,8 +69,9 @@ npm -v
 node -v
 
 # Install agent
-git clone https://github.com/GoogleCloudPlatform/cloud-profiler-nodejs.git 
+git clone https://github.com/GoogleCloudPlatform/cloud-profiler-nodejs.git
 cd cloud-profiler-nodejs
+git pull {{.Repo}} {{.Branch}}
 git reset --hard {{.Commit}}
 npm install
 npm run compile
@@ -162,10 +165,14 @@ func renderStartupScript(template *template.Template, inst instanceConfig) (stri
 		struct {
 			Service     string
 			NodeVersion string
+			Repo        string
+			Branch      string
 			Commit      string
 		}{
 			Service:     inst.service,
 			NodeVersion: inst.nodeVersion,
+			Repo:        *repo,
+			Branch:      *branch,
 			Commit:      *commit,
 		})
 	if err != nil {
@@ -289,6 +296,12 @@ func TestAgentIntegration(t *testing.T) {
 	zone := os.Getenv("GCLOUD_TESTS_NODEJS_ZONE")
 	if zone == "" {
 		t.Fatalf("Getenv(GCLOUD_TESTS_NODEJS_ZONE) got empty string")
+	}
+	if *repo == "" {
+		*repo = "https://github.com/GoogleCloudPlatform/cloud-profiler-nodejs.git"
+	}
+	if *branch == "" {
+		t.Fatal("branch flag is not set")
 	}
 	if *commit == "" {
 		t.Fatal("commit flag is not set")
