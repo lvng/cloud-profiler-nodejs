@@ -29,6 +29,7 @@ import {Profiler} from './profiler';
 
 const common: Common = require('@google-cloud/common');
 const pjson = require('../../package.json');
+const heapProfiler = require('bindings')('sampling_heap_profiler');
 
 /**
  * @return value of metadata field.
@@ -129,13 +130,28 @@ export async function start(config: Config = {}): Promise<void> {
         config);
     return;
   }
+  // start the v8 heap profiler if heap profiling is enabled. This must be done
+  // before any asynchronous calls are made so samples from the first tick can
+  // be captured.
+  if (!(config.disableHeap === false)) {
+    heapProfiler.startSamplingHeapProfiler(
+        config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
+        config.heapMaxStackDepth || defaultConfig.heapIntervalBytes);
+  }
+
   let normalizedConfig: ProfilerConfig;
   try {
     normalizedConfig = await initConfig(config);
   } catch (e) {
+    heapProfiler.stopSamplingHeapProfiler();
     logError(`Could not start profiler: ${e}`, config);
     return;
   }
+
+  if (normalizedConfig.disableHeap) {
+    heapProfiler.stopSamplingHeapProfiler();
+  }
+
   profiler = new Profiler(normalizedConfig);
   profiler.start();
 }
@@ -152,7 +168,21 @@ function logError(msg: string, config: Config) {
  * profiles.
  */
 export async function startLocal(config: Config = {}): Promise<void> {
+  // start the v8 heap profiler if heap profiling is enabled. This must be done
+  // before any asynchronous calls are made so samples from the first tick can
+  // be captured.
+  if (!(config.disableHeap === false)) {
+    heapProfiler.startSamplingHeapProfiler(
+        config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
+        config.heapMaxStackDepth || defaultConfig.heapIntervalBytes);
+  }
+
   const normalizedConfig = await initConfig(config);
+
+  if (normalizedConfig.disableHeap) {
+    heapProfiler.stopSamplingHeapProfiler();
+  }
+
   profiler = new Profiler(normalizedConfig);
 
   while (true) {
