@@ -43,13 +43,30 @@ export class HeapProfiler {
     return serializeHeapProfile(result, startTimeNanos, this.intervalBytes);
   }
 
+  reset(intervalBytes: number, stackDepth: number) {
+    if (this.intervalBytes === intervalBytes &&
+        this.stackDepth === stackDepth) {
+      return;
+    }
+    this.intervalBytes = intervalBytes;
+    this.stackDepth = stackDepth;
+    if (this.enabled) {
+      this.disable();
+    }
+    this.enable();
+  }
+
   enable() {
-    profiler.startSamplingHeapProfiler(this.intervalBytes, this.stackDepth);
-    this.enabled = true;
+    if (!this.enabled) {
+      profiler.startSamplingHeapProfiler(this.intervalBytes, this.stackDepth);
+      this.enabled = true;
+    }
   }
 
   disable() {
-    this.enabled = false;
-    profiler.stopSamplingHeapProfiler();
+    if (this.enabled) {
+      this.enabled = false;
+      profiler.stopSamplingHeapProfiler();
+    }
   }
 }

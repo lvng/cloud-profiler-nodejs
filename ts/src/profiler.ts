@@ -219,7 +219,9 @@ export class Profiler extends common.ServiceObject {
   timeProfiler: TimeProfiler|undefined;
   heapProfiler: HeapProfiler|undefined;
 
-  constructor(config: ProfilerConfig) {
+  constructor(
+      config: ProfilerConfig, heapProfiler?: HeapProfiler,
+      timeProfiler?: TimeProfiler) {
     config = common.util.normalizeArguments(null, config);
     const serviceConfig = {
       baseUrl: config.baseApiUrl,
@@ -255,12 +257,22 @@ export class Profiler extends common.ServiceObject {
     this.profileTypes = [];
     if (!this.config.disableTime) {
       this.profileTypes.push(ProfileTypes.Wall);
-      this.timeProfiler = new TimeProfiler(this.config.timeIntervalMicros);
+      if (timeProfiler) {
+        this.timeProfiler = timeProfiler;
+      } else {
+        this.timeProfiler = new TimeProfiler(this.config.timeIntervalMicros);
+      }
     }
     if (!this.config.disableHeap) {
       this.profileTypes.push(ProfileTypes.Heap);
-      this.heapProfiler = new HeapProfiler(
-          this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
+      if (heapProfiler) {
+        this.heapProfiler = heapProfiler;
+        this.heapProfiler.reset(
+            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
+      } else {
+        this.heapProfiler = new HeapProfiler(
+            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
+      }
     }
 
     this.retryer = new Retryer(

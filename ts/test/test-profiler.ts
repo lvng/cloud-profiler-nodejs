@@ -19,7 +19,7 @@ import * as extend from 'extend';
 import * as nock from 'nock';
 import * as pify from 'pify';
 import * as sinon from 'sinon';
-import {instance, mock, when} from 'ts-mockito';
+import {instance, mock, reset, verify, when} from 'ts-mockito';
 import * as zlib from 'zlib';
 
 import {perftools} from '../../proto/profile';
@@ -62,12 +62,8 @@ const testConfig: ProfilerConfig = {
 
 
 const mockTimeProfiler = mock(TimeProfiler);
-when(mockTimeProfiler.profile(10 * 1000)).thenReturn(new Promise((resolve) => {
-  resolve(timeProfile);
-}));
 
 const mockHeapProfiler = mock(HeapProfiler);
-when(mockHeapProfiler.profile()).thenReturn(heapProfile);
 
 nock.disableNetConnect();
 function nockOauth2(): nock.Scope {
@@ -98,7 +94,19 @@ describe('Retryer', () => {
 });
 
 describe('Profiler', () => {
+  beforeEach(() => {
+    when(mockTimeProfiler.profile(10 * 1000))
+        .thenReturn(new Promise((resolve) => {
+          resolve(timeProfile);
+        }));
+
+    when(mockHeapProfiler.profile()).thenReturn(heapProfile);
+    when(mockHeapProfiler.enable()).thenReturn();
+    when(mockHeapProfiler.disable()).thenReturn();
+  });
   afterEach(() => {
+    reset(mockHeapProfiler);
+    reset(mockTimeProfiler);
     nock.cleanAll();
   });
   describe('profile', () => {
@@ -133,6 +141,44 @@ describe('Profiler', () => {
              Buffer.from(prof.profileBytes as 'string', 'base64');
          const unzippedBytes = await pify(zlib.gunzip)(decodedBytes);
          const outProfile = perftools.profiles.Profile.decode(unzippedBytes);
+         assert.deepEqual(decodedHeapProfile, outProfile);
+       });
+    it('should return expected profile when profile type is WALL and ' +
+           'constructed with time profiler',
+       async () => {
+         const profiler =
+             new Profiler(testConfig, undefined, instance(mockTimeProfiler));
+         const requestProf = {
+           name: 'projects/12345678901/test-projectId',
+           profileType: 'WALL',
+           duration: '10s',
+           labels: {instance: 'test-instance'}
+         };
+         const prof = await profiler.profile(requestProf);
+         const decodedBytes =
+             Buffer.from(prof.profileBytes as 'string', 'base64');
+         const unzippedBytes = await pify(zlib.gunzip)(decodedBytes);
+         const outProfile = perftools.profiles.Profile.decode(unzippedBytes);
+         assert.deepEqual(decodedTimeProfile, outProfile);
+       });
+    it('should return expected profile when profile type is HEAP and ' +
+           'constructed with heap profiler',
+       async () => {
+         const heapMock = instance(mockHeapProfiler);
+         const profiler = new Profiler(testConfig, heapMock);
+         const requestProf = {
+           name: 'projects/12345678901/test-projectId',
+           profileType: 'HEAP',
+           labels: {instance: 'test-instance'}
+         };
+         const prof = await profiler.profile(requestProf);
+         const decodedBytes =
+             Buffer.from(prof.profileBytes as 'string', 'base64');
+         const unzippedBytes = await pify(zlib.gunzip)(decodedBytes);
+         const outProfile = perftools.profiles.Profile.decode(unzippedBytes);
+         verify(mockHeapProfiler.reset(
+                    testConfig.heapIntervalBytes, testConfig.heapMaxStackDepth))
+             .called();
          assert.deepEqual(decodedHeapProfile, outProfile);
        });
     it('should throw error when unexpected profile type is requested.',
