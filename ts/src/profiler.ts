@@ -24,7 +24,7 @@ import {perftools} from '../../proto/profile';
 import {Common, Logger, Service, ServiceObject} from '../third_party/types/common-types';
 
 import {ProfilerConfig} from './config';
-import {HeapProfiler} from './profilers/heap-profiler';
+import * as heapProfiler from './profilers/heap-profiler';
 import {TimeProfiler} from './profilers/time-profiler';
 
 export const common: Common = require('@google-cloud/common');
@@ -217,11 +217,8 @@ export class Profiler extends common.ServiceObject {
 
   // Public for testing.
   timeProfiler: TimeProfiler|undefined;
-  heapProfiler: HeapProfiler|undefined;
 
-  constructor(
-      config: ProfilerConfig, heapProfiler?: HeapProfiler,
-      timeProfiler?: TimeProfiler) {
+  constructor(config: ProfilerConfig) {
     config = common.util.normalizeArguments(null, config);
     const serviceConfig = {
       baseUrl: config.baseApiUrl,
@@ -257,22 +254,12 @@ export class Profiler extends common.ServiceObject {
     this.profileTypes = [];
     if (!this.config.disableTime) {
       this.profileTypes.push(ProfileTypes.Wall);
-      if (timeProfiler) {
-        this.timeProfiler = timeProfiler;
-      } else {
-        this.timeProfiler = new TimeProfiler(this.config.timeIntervalMicros);
-      }
+      this.timeProfiler = new TimeProfiler(this.config.timeIntervalMicros);
     }
     if (!this.config.disableHeap) {
       this.profileTypes.push(ProfileTypes.Heap);
-      if (heapProfiler) {
-        this.heapProfiler = heapProfiler;
-        this.heapProfiler.reset(
-            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
-      } else {
-        this.heapProfiler = new HeapProfiler(
-            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
-      }
+      heapProfiler.set(
+          this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
     }
 
     this.retryer = new Retryer(
@@ -472,10 +459,10 @@ export class Profiler extends common.ServiceObject {
    * Public to allow for testing.
    */
   async writeHeapProfile(prof: RequestProfile): Promise<RequestProfile> {
-    if (!this.heapProfiler) {
+    if (this.config.disableHeap) {
       throw Error('Cannot collect heap profile, heap profiler not enabled.');
     }
-    const p = this.heapProfiler.profile();
+    const p = heapProfiler.profile();
     prof.profileBytes = await profileBytes(p);
     return prof;
   }

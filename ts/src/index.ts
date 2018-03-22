@@ -26,7 +26,7 @@ import {AuthenticationConfig, Common, ServiceConfig} from '../third_party/types/
 
 import {Config, defaultConfig, ProfilerConfig} from './config';
 import {Profiler} from './profiler';
-import {HeapProfiler} from './profilers/heap-profiler';
+import * as heapProfiler from './profilers/heap-profiler';
 
 const common: Common = require('@google-cloud/common');
 const pjson = require('../../package.json');
@@ -131,21 +131,21 @@ export async function start(config: Config = {}): Promise<void> {
     return;
   }
 
-  // start the heap profiler if profiler config does not indicate heap profiling
+  // Start the heap profiler if profiler config does not indicate heap profiling
   // is disabled. This must be done before any asynchronous calls are made so
   // samples from the first tick can be captured.
-  let heapProfiler: HeapProfiler|undefined;
   if (!config.disableHeap) {
-    heapProfiler = new HeapProfiler(
+    heapProfiler.set(
         config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
         config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
+    heapProfiler.enable();
   }
 
   let normalizedConfig: ProfilerConfig;
   try {
     normalizedConfig = await initConfig(config);
   } catch (e) {
-    if (heapProfiler) {
+    if (heapProfiler.isEnabled()) {
       heapProfiler.disable();
     }
     logError(`Could not start profiler: ${e}`, config);
@@ -154,12 +154,11 @@ export async function start(config: Config = {}): Promise<void> {
 
   // stop heap profiler if, after initialization, the config indicates that
   // the heap profiler is disabled.
-  if (normalizedConfig.disableHeap && heapProfiler) {
+  if (normalizedConfig.disableHeap && heapProfiler.isEnabled()) {
     heapProfiler.disable();
-    heapProfiler = undefined;
   }
 
-  profiler = new Profiler(normalizedConfig, heapProfiler);
+  profiler = new Profiler(normalizedConfig);
   profiler.start();
 }
 
@@ -175,21 +174,24 @@ function logError(msg: string, config: Config) {
  * profiles.
  */
 export async function startLocal(config: Config = {}): Promise<void> {
-  // start the v8 heap profiler if heap profiling is enabled. This must be done
+  // Start the v8 heap profiler if heap profiling is enabled. This must be done
   // before any asynchronous calls are made so samples from the first tick can
   // be captured.
-  let heapProfiler: HeapProfiler|undefined;
   if (!config.disableHeap) {
-    heapProfiler = new HeapProfiler(
+    heapProfiler.set(
         config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
         config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
+    heapProfiler.enable();
   }
 
   const normalizedConfig = await initConfig(config);
 
-  if (normalizedConfig.disableHeap && heapProfiler) {
+  // stop heap profiler if, after initialization, the config indicates that
+  // the heap profiler is disabled.
+  if (normalizedConfig.disableHeap && heapProfiler.isEnabled()) {
     heapProfiler.disable();
   }
+
   profiler = new Profiler(normalizedConfig);
   while (true) {
     if (!config.disableHeap) {

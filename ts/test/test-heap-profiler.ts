@@ -18,7 +18,7 @@ import * as delay from 'delay';
 import * as sinon from 'sinon';
 
 import {perftools} from '../../proto/profile';
-import {HeapProfiler} from '../src/profilers/heap-profiler';
+import * as heapProfiler from '../src/profilers/heap-profiler';
 
 import {heapProfile, v8HeapProfile} from './profiles-for-tests';
 
@@ -45,19 +45,18 @@ describe('HeapProfiler', () => {
     it('should return a profile equal to the expected profile', async () => {
       const intervalBytes = 1024 * 512;
       const stackDepth = 32;
-      const profiler = new HeapProfiler(intervalBytes, stackDepth);
-      const profile = profiler.profile();
+      heapProfiler.set(intervalBytes, stackDepth);
+      const profile = heapProfiler.profile();
       assert.deepEqual(heapProfile, profile);
     });
 
     it('should throw error when disabled', () => {
       const intervalBytes = 1024 * 512;
       const stackDepth = 32;
-      const profiler = new HeapProfiler(intervalBytes, stackDepth);
-      profiler.disable();
+      heapProfiler.disable();
       assert.throws(
           () => {
-            profiler.profile();
+            heapProfiler.profile();
           },
           (err: Error) => {
             return err.message === 'Heap profiler is not enabled.';

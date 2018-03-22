@@ -15,58 +15,63 @@
  */
 
 import {perftools} from '../../../proto/profile';
+import {defaultConfig} from '../config';
+
 import {serializeHeapProfile} from './profile-serializer';
 
 const profiler = require('bindings')('sampling_heap_profiler');
 
-export class HeapProfiler {
-  private enabled = false;
+let enabled = false;
+let heapIntervalBytes = defaultConfig.heapIntervalBytes;
+let heapStackDepth = defaultConfig.heapMaxStackDepth;
 
-  /**
-   * @param intervalBytes - average bytes between samples.
-   * @param stackDepth - upper limit on number of frames in stack for sample.
-   */
-  constructor(private intervalBytes: number, private stackDepth: number) {
-    this.enable();
+/*
+ * Collects a heap profile when heapProfiler is enabled. Otherwise throws
+ * an error.
+ */
+export function profile(): perftools.profiles.IProfile {
+  if (!enabled) {
+    throw new Error('Heap profiler is not enabled.');
   }
+  const result = profiler.getAllocationProfile();
+  const startTimeNanos = Date.now() * 1000 * 1000;
+  return serializeHeapProfile(result, startTimeNanos, heapIntervalBytes);
+}
 
-  /**
-   * Collects a heap profile when heapProfiler is enabled. Otherwise throws
-   * an error.
-   */
-  profile(): perftools.profiles.IProfile {
-    if (!this.enabled) {
-      throw new Error('Heap profiler is not enabled.');
-    }
-    const result = profiler.getAllocationProfile();
-    const startTimeNanos = Date.now() * 1000 * 1000;
-    return serializeHeapProfile(result, startTimeNanos, this.intervalBytes);
+/**
+ * Sets the average number of bytes between samples and maximum stack depth for
+ * the heap profiler, and enables the heap profiler if it is not currently
+ * enabled.
+ *
+ * @param intervalBytes - average number of bytes between samples.
+ * @param stackDepth - maximum stack depth for samples collected.
+ */
+export function set(intervalBytes: number, stackDepth: number) {
+  if (heapIntervalBytes === intervalBytes && heapStackDepth === stackDepth) {
+    return;
   }
-
-  reset(intervalBytes: number, stackDepth: number) {
-    if (this.intervalBytes === intervalBytes &&
-        this.stackDepth === stackDepth) {
-      return;
-    }
-    this.intervalBytes = intervalBytes;
-    this.stackDepth = stackDepth;
-    if (this.enabled) {
-      this.disable();
-    }
-    this.enable();
+  heapIntervalBytes = intervalBytes;
+  heapStackDepth = stackDepth;
+  if (enabled) {
+    disable();
   }
+  enable();
+}
 
-  enable() {
-    if (!this.enabled) {
-      profiler.startSamplingHeapProfiler(this.intervalBytes, this.stackDepth);
-      this.enabled = true;
-    }
+export function isEnabled() {
+  return enabled;
+}
+
+export function enable() {
+  if (!enabled) {
+    profiler.startSamplingHeapProfiler(heapIntervalBytes, heapStackDepth);
+    enabled = true;
   }
+}
 
-  disable() {
-    if (this.enabled) {
-      this.enabled = false;
-      profiler.stopSamplingHeapProfiler();
-    }
+export function disable() {
+  if (enabled) {
+    enabled = false;
+    profiler.stopSamplingHeapProfiler();
   }
 }
