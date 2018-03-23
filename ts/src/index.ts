@@ -133,29 +133,26 @@ export async function start(config: Config = {}): Promise<void> {
 
   // Start the heap profiler if profiler config does not indicate heap profiling
   // is disabled. This must be done before any asynchronous calls are made so
-  // samples from the first tick can be captured.
+  // all memory allocations made after start() is called can be captured.
   if (!config.disableHeap) {
-    heapProfiler.set(
+    heapProfiler.start(
         config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
         config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
-    heapProfiler.enable();
   }
 
   let normalizedConfig: ProfilerConfig;
   try {
     normalizedConfig = await initConfig(config);
   } catch (e) {
-    if (heapProfiler.isEnabled()) {
-      heapProfiler.disable();
-    }
+    heapProfiler.stop();
     logError(`Could not start profiler: ${e}`, config);
     return;
   }
 
   // stop heap profiler if, after initialization, the config indicates that
   // the heap profiler is disabled.
-  if (normalizedConfig.disableHeap && heapProfiler.isEnabled()) {
-    heapProfiler.disable();
+  if (normalizedConfig.disableHeap) {
+    heapProfiler.stop();
   }
 
   profiler = new Profiler(normalizedConfig);
@@ -178,18 +175,17 @@ export async function startLocal(config: Config = {}): Promise<void> {
   // before any asynchronous calls are made so samples from the first tick can
   // be captured.
   if (!config.disableHeap) {
-    heapProfiler.set(
+    heapProfiler.start(
         config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
         config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
-    heapProfiler.enable();
   }
 
   const normalizedConfig = await initConfig(config);
 
   // stop heap profiler if, after initialization, the config indicates that
   // the heap profiler is disabled.
-  if (normalizedConfig.disableHeap && heapProfiler.isEnabled()) {
-    heapProfiler.disable();
+  if (normalizedConfig.disableHeap) {
+    heapProfiler.stop();
   }
 
   profiler = new Profiler(normalizedConfig);

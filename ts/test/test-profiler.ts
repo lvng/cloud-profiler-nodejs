@@ -99,9 +99,8 @@ describe('Profiler', () => {
           resolve(timeProfile);
         }));
 
-    sinonStubs.push(sinon.stub(heapProfiler, 'enable'));
-    sinonStubs.push(sinon.stub(heapProfiler, 'disable'));
-    sinonStubs.push(sinon.stub(heapProfiler, 'set'));
+    sinonStubs.push(sinon.stub(heapProfiler, 'stop'));
+    sinonStubs.push(sinon.stub(heapProfiler, 'start'));
     sinonStubs.push(sinon.stub(heapProfiler, 'profile').returns(heapProfile));
   });
   afterEach(() => {

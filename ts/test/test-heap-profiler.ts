@@ -28,7 +28,7 @@ const v8HeapProfiler = require('bindings')('sampling_heap_profiler');
 describe('HeapProfiler', () => {
   describe('profile', () => {
     const sinonStubs: sinon.SinonStub[] = new Array();
-    before(() => {
+    beforeEach(() => {
       sinonStubs.push(sinon.stub(v8HeapProfiler, 'startSamplingHeapProfiler'));
       sinonStubs.push(sinon.stub(v8HeapProfiler, 'stopSamplingHeapProfiler'));
       sinonStubs.push(sinon.stub(v8HeapProfiler, 'getAllocationProfile')
@@ -36,7 +36,8 @@ describe('HeapProfiler', () => {
       sinonStubs.push(sinon.stub(Date, 'now').returns(0));
     });
 
-    after(() => {
+    afterEach(() => {
+      heapProfiler.stop();
       sinonStubs.forEach((stub) => {
         stub.restore();
       });
@@ -45,15 +46,26 @@ describe('HeapProfiler', () => {
     it('should return a profile equal to the expected profile', async () => {
       const intervalBytes = 1024 * 512;
       const stackDepth = 32;
-      heapProfiler.set(intervalBytes, stackDepth);
+      heapProfiler.start(intervalBytes, stackDepth);
       const profile = heapProfiler.profile();
       assert.deepEqual(heapProfile, profile);
     });
 
-    it('should throw error when disabled', () => {
+    it('should throw error when not started', () => {
+      assert.throws(
+          () => {
+            heapProfiler.profile();
+          },
+          (err: Error) => {
+            return err.message === 'Heap profiler is not enabled.';
+          });
+    });
+
+    it('should throw error when started then stopped', () => {
       const intervalBytes = 1024 * 512;
       const stackDepth = 32;
-      heapProfiler.disable();
+      heapProfiler.start(intervalBytes, stackDepth);
+      heapProfiler.stop();
       assert.throws(
           () => {
             heapProfiler.profile();

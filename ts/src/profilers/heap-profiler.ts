@@ -39,37 +39,28 @@ export function profile(): perftools.profiles.IProfile {
 }
 
 /**
- * Sets the average number of bytes between samples and maximum stack depth for
- * the heap profiler, and enables the heap profiler if it is not currently
- * enabled.
+ * Starts heap profiling. If heap profiling has already been started with
+ * different parameters, this re-starts heap profiling with given parameters.
  *
  * @param intervalBytes - average number of bytes between samples.
  * @param stackDepth - maximum stack depth for samples collected.
  */
-export function set(intervalBytes: number, stackDepth: number) {
-  if (heapIntervalBytes === intervalBytes && heapStackDepth === stackDepth) {
+export function start(intervalBytes: number, stackDepth: number) {
+  if (enabled && heapIntervalBytes === intervalBytes &&
+      heapStackDepth === stackDepth) {
     return;
   }
   heapIntervalBytes = intervalBytes;
   heapStackDepth = stackDepth;
   if (enabled) {
-    disable();
+    stop();
   }
-  enable();
+  profiler.startSamplingHeapProfiler(heapIntervalBytes, heapStackDepth);
+  enabled = true;
 }
 
-export function isEnabled() {
-  return enabled;
-}
-
-export function enable() {
-  if (!enabled) {
-    profiler.startSamplingHeapProfiler(heapIntervalBytes, heapStackDepth);
-    enabled = true;
-  }
-}
-
-export function disable() {
+// Stops heap profiling. If heap profiling has not been started, does nothing.
+export function stop() {
   if (enabled) {
     enabled = false;
     profiler.stopSamplingHeapProfiler();

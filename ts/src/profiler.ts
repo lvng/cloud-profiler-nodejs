@@ -258,10 +258,9 @@ export class Profiler extends common.ServiceObject {
     }
     if (!this.config.disableHeap) {
       this.profileTypes.push(ProfileTypes.Heap);
-      heapProfiler.set(
+      heapProfiler.start(
           this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
     }
-
     this.retryer = new Retryer(
         this.config.initialBackoffMillis, this.config.backoffCapMillis,
         this.config.backoffMultiplier);
