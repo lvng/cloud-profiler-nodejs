@@ -15,6 +15,7 @@
  */
 
 import * as delay from 'delay';
+import {describe} from 'mocha';
 import * as sinon from 'sinon';
 
 import {perftools} from '../../proto/profile';
@@ -26,23 +27,26 @@ const assert = require('assert');
 const v8HeapProfiler = require('bindings')('sampling_heap_profiler');
 
 describe('HeapProfiler', () => {
+  let startStub: sinon.SinonStub;
+  let stopStub: sinon.SinonStub;
+  let profileStub: sinon.SinonStub;
+  let dateStub: sinon.SinonStub;
+  beforeEach(() => {
+    startStub = sinon.stub(v8HeapProfiler, 'startSamplingHeapProfiler');
+    stopStub = sinon.stub(v8HeapProfiler, 'stopSamplingHeapProfiler');
+    profileStub = sinon.stub(v8HeapProfiler, 'getAllocationProfile')
+                      .returns(v8HeapProfile);
+    dateStub = sinon.stub(Date, 'now').returns(0);
+  });
+
+  afterEach(() => {
+    heapProfiler.stop();
+    startStub.restore();
+    stopStub.restore();
+    profileStub.restore();
+    dateStub.restore();
+  });
   describe('profile', () => {
-    const sinonStubs: sinon.SinonStub[] = new Array();
-    beforeEach(() => {
-      sinonStubs.push(sinon.stub(v8HeapProfiler, 'startSamplingHeapProfiler'));
-      sinonStubs.push(sinon.stub(v8HeapProfiler, 'stopSamplingHeapProfiler'));
-      sinonStubs.push(sinon.stub(v8HeapProfiler, 'getAllocationProfile')
-                          .returns(v8HeapProfile));
-      sinonStubs.push(sinon.stub(Date, 'now').returns(0));
-    });
-
-    afterEach(() => {
-      heapProfiler.stop();
-      sinonStubs.forEach((stub) => {
-        stub.restore();
-      });
-    });
-
     it('should return a profile equal to the expected profile', async () => {
       const intervalBytes = 1024 * 512;
       const stackDepth = 32;
@@ -73,6 +77,50 @@ describe('HeapProfiler', () => {
           (err: Error) => {
             return err.message === 'Heap profiler is not enabled.';
           });
+    });
+  });
+
+  describe('start', () => {
+    it('should call startSamplingHeapProfiler', () => {
+      const intervalBytes1 = 1024 * 512;
+      const stackDepth1 = 32;
+      heapProfiler.start(intervalBytes1, stackDepth1);
+      assert.ok(
+          startStub.calledWith(intervalBytes1, stackDepth1),
+          'expected startSamplingHeapProfiler to be called');
+    });
+    it('should throw error when enabled and started with different parameters',
+       () => {
+         const intervalBytes1 = 1024 * 512;
+         const stackDepth1 = 32;
+         heapProfiler.start(intervalBytes1, stackDepth1);
+         assert.ok(
+             startStub.calledWith(intervalBytes1, stackDepth1),
+             'expected startSamplingHeapProfiler to be called');
+         startStub.resetHistory();
+         const intervalBytes2 = 1024 * 128;
+         const stackDepth2 = 64;
+         heapProfiler.start(intervalBytes2, stackDepth2);
+         assert.ok(
+             startStub.calledWith(intervalBytes2, stackDepth2),
+             'expected startSamplingHeapProfiler to be called second time');
+         assert.ok(
+             stopStub.calledBefore(startStub),
+             'expected stopSamplingHeapProfiles to be stopped before restarting');
+       });
+  });
+
+  describe('stop', () => {
+    it('should not call stopSamplingHeapProfiler if profiler not started',
+       () => {
+         heapProfiler.stop();
+         assert.ok(!stopStub.called, 'stop() should have been no-op.');
+       });
+    it('should call stopSamplingHeapProfiler if profiler started', () => {
+      heapProfiler.start(1024 * 512, 32);
+      heapProfiler.stop();
+      assert.ok(
+          stopStub.called, 'expected stopSamplingHeapProfiler to be called');
     });
   });
 });
