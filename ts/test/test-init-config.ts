@@ -19,9 +19,9 @@ import * as extend from 'extend';
 import * as gcpMetadata from 'gcp-metadata';
 import * as sinon from 'sinon';
 
-import {initConfig} from '../src/index';
+import {startHelper} from '../src/index';
 
-describe('initConfig', () => {
+describe('startHelper', () => {
   let savedEnv: NodeJS.ProcessEnv;
   let metadataStub: sinon.SinonStub|undefined;
 
@@ -67,7 +67,7 @@ describe('initConfig', () => {
       zone: 'zone',
       projectId: 'fake-projectId'
     };
-    const initializedConfig = await initConfig(config);
+    const initializedConfig = await startHelper(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -87,7 +87,7 @@ describe('initConfig', () => {
       zone: 'zone',
       projectId: 'fake-projectId'
     };
-    const initializedConfig = await initConfig(config);
+    const initializedConfig = await startHelper(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -114,7 +114,7 @@ describe('initConfig', () => {
       zone: 'gce-zone',
       projectId: 'projectId'
     };
-    const initializedConfig = await initConfig(config);
+    const initializedConfig = await startHelper(config);
     assert.deepEqual(
         initializedConfig, extend(expConfig, internalConfigParams));
   });
@@ -134,7 +134,7 @@ describe('initConfig', () => {
          disableTime: false,
          projectId: 'fake-projectId',
        };
-       const initializedConfig = await initConfig(config);
+       const initializedConfig = await startHelper(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });
@@ -148,8 +148,8 @@ describe('initConfig', () => {
       disableHeap: true,
       disableTime: true,
     };
-    return initConfig(config)
-        .then(initializedConfig => {
+    return startHelper(config)
+        .then(() => {
           assert.fail('expected error because no service in config');
         })
         .catch((e: Error) => {
@@ -170,7 +170,7 @@ describe('initConfig', () => {
       instance: 'instance',
       zone: 'zone'
     };
-    const initializedConfig = await initConfig(config);
+    const initializedConfig = await startHelper(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -192,7 +192,7 @@ describe('initConfig', () => {
         internalConfigParams);
     expConfig.baseApiUrl =
         'https://test-cloudprofiler.sandbox.googleapis.com/v2';
-    const initializedConfig = await initConfig(config);
+    const initializedConfig = await startHelper(config);
     assert.deepEqual(initializedConfig, expConfig);
   });
 
@@ -220,7 +220,7 @@ describe('initConfig', () => {
          instance: 'envConfig-instance',
          zone: 'envConfig-zone'
        };
-       const initializedConfig = await initConfig(config);
+       const initializedConfig = await startHelper(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });
@@ -248,7 +248,7 @@ describe('initConfig', () => {
          instance: 'instance',
          zone: 'zone'
        };
-       const initializedConfig = await initConfig(config);
+       const initializedConfig = await startHelper(config);
        assert.deepEqual(
            initializedConfig, extend(config, internalConfigParams));
      });
@@ -272,7 +272,7 @@ describe('initConfig', () => {
        };
 
        const config = {};
-       const initializedConfig = await initConfig(config);
+       const initializedConfig = await startHelper(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });

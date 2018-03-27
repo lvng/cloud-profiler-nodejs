@@ -48,12 +48,10 @@ function hasService(config: Config):
 
 /**
  * Sets unset values in the configuration to the value retrieved from
- * environment variables, metadata, or specified in defaultConfig.
+ * environment variables or specified in defaultConfig.
  * Throws error if value that must be set cannot be initialized.
- *
- * Exported for testing purposes.
  */
-export async function initConfig(config: Config): Promise<ProfilerConfig> {
+export function initConfig(config: Config): ProfilerConfig {
   config = common.util.normalizeArguments(null, config);
 
   const envConfig: Config = {
@@ -80,7 +78,19 @@ export async function initConfig(config: Config): Promise<ProfilerConfig> {
   const mergedConfig =
       extend(true, {}, defaultConfig, envSetConfig, envConfig, config);
 
-  if (!mergedConfig.zone || !mergedConfig.instance) {
+  if (!hasService(mergedConfig)) {
+    throw new Error('Service must be specified in the configuration.');
+  }
+
+  return mergedConfig;
+}
+
+/**
+ * Sets unset values in the configuration which can be retrieved from GCP
+ * metadata.
+ */
+async function initMetadata(config: ProfilerConfig): Promise<ProfilerConfig> {
+  if (!config.zone || !config.instance) {
     const [instance, zone] =
         await Promise
             .all([
@@ -91,28 +101,25 @@ export async function initConfig(config: Config): Promise<ProfilerConfig> {
                     // ignore errors, which will occur when not on GCE.
                 }) ||
         [undefined, undefined];
-    if (!mergedConfig.zone && zone) {
-      mergedConfig.zone = zone.substring(zone.lastIndexOf('/') + 1);
+    if (!config.zone && zone) {
+      config.zone = zone.substring(zone.lastIndexOf('/') + 1);
     }
-    if (!mergedConfig.instance && instance) {
-      mergedConfig.instance = instance;
+    if (!config.instance && instance) {
+      config.instance = instance;
     }
   }
-
-  if (!hasService(mergedConfig)) {
-    throw new Error('Service must be specified in the configuration.');
-  }
-
-  return mergedConfig;
+  return config;
 }
 
 let profiler: Profiler|undefined = undefined;
 
 /**
- * Initializes the config, and starts heap profiler if the heap profiler is 
- * needed .
+ * Initializes the config, and starts heap profiler if the heap profiler is
+ * needed.
  */
-async function startHelper(config: Config): Promise<ProfilerConfig> {
+export async function startHelper(config: Config): Promise<ProfilerConfig> {
+  let profilerConfig = initConfig(config);
+
   // Start the heap profiler if profiler config does not indicate heap profiling
   // is disabled. This must be done before any asynchronous calls are made so
   // all memory allocations made after start() is called can be captured.
@@ -121,22 +128,8 @@ async function startHelper(config: Config): Promise<ProfilerConfig> {
         config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
         config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
   }
-
-  let normalizedConfig: ProfilerConfig;
-  try {
-    normalizedConfig = await initConfig(config);
-  } catch (e) {
-    heapProfiler.stop();
-    throw e;
-  }
-
-  // Stop heap profiler if, after initialization, the config indicates that
-  // the heap profiler is disabled.
-  if (normalizedConfig.disableHeap) {
-    heapProfiler.stop();
-  }
-
-  return normalizedConfig;
+  profilerConfig = await initMetadata(profilerConfig);
+  return profilerConfig;
 }
 
 /**
