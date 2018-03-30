@@ -100,13 +100,17 @@ describe('HeapProfiler', () => {
          startStub.resetHistory();
          const intervalBytes2 = 1024 * 128;
          const stackDepth2 = 64;
-         heapProfiler.start(intervalBytes2, stackDepth2);
+         try {
+           heapProfiler.start(intervalBytes2, stackDepth2);
+         } catch (e) {
+           assert.equal(
+               e.message,
+               'Heap profiler is already started  with intervalBytes 524288 and' +
+                   ' stackDepth 64');
+         }
          assert.ok(
-             startStub.calledWith(intervalBytes2, stackDepth2),
-             'expected startSamplingHeapProfiler to be called second time');
-         assert.ok(
-             stopStub.calledBefore(startStub),
-             'expected stopSamplingHeapProfiles to be stopped before restarting');
+             !startStub.called,
+             'expected startSamplingHeapProfiler not to be called second time');
        });
   });
 

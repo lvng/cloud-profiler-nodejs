@@ -51,7 +51,7 @@ function hasService(config: Config):
  * environment variables or specified in defaultConfig.
  * Throws error if value that must be set cannot be initialized.
  */
-export function initConfig(config: Config): ProfilerConfig {
+function initConfigLocal(config: Config): ProfilerConfig {
   config = common.util.normalizeArguments(null, config);
 
   const envConfig: Config = {
@@ -89,7 +89,8 @@ export function initConfig(config: Config): ProfilerConfig {
  * Sets unset values in the configuration which can be retrieved from GCP
  * metadata.
  */
-async function initMetadata(config: ProfilerConfig): Promise<ProfilerConfig> {
+async function initConfigMetadata(config: ProfilerConfig):
+    Promise<ProfilerConfig> {
   if (!config.zone || !config.instance) {
     const [instance, zone] =
         await Promise
@@ -117,18 +118,18 @@ let profiler: Profiler|undefined = undefined;
  * Initializes the config, and starts heap profiler if the heap profiler is
  * needed.
  */
-export async function startHelper(config: Config): Promise<ProfilerConfig> {
-  let profilerConfig = initConfig(config);
+export async function initConfigAndMaybeStartHeapProfiler(config: Config):
+    Promise<ProfilerConfig> {
+  let profilerConfig = initConfigLocal(config);
 
   // Start the heap profiler if profiler config does not indicate heap profiling
   // is disabled. This must be done before any asynchronous calls are made so
   // all memory allocations made after start() is called can be captured.
-  if (!config.disableHeap) {
+  if (!profilerConfig.disableHeap) {
     heapProfiler.start(
-        config.heapIntervalBytes || defaultConfig.heapIntervalBytes,
-        config.heapMaxStackDepth || defaultConfig.heapMaxStackDepth);
+        profilerConfig.heapIntervalBytes, profilerConfig.heapMaxStackDepth);
   }
-  profilerConfig = await initMetadata(profilerConfig);
+  profilerConfig = await initConfigMetadata(profilerConfig);
   return profilerConfig;
 }
 
@@ -157,16 +158,10 @@ export async function start(config: Config = {}): Promise<void> {
 
   let normalizedConfig: ProfilerConfig;
   try {
-    normalizedConfig = await startHelper(config);
+    normalizedConfig = await initConfigAndMaybeStartHeapProfiler(config);
   } catch (e) {
     logError(`Could not start profiler: ${e}`, config);
     return;
-  }
-
-  // Stop heap profiler if, after initialization, the config indicates that
-  // the heap profiler is disabled.
-  if (normalizedConfig.disableHeap) {
-    heapProfiler.stop();
   }
 
   profiler = new Profiler(normalizedConfig);
@@ -187,7 +182,7 @@ function logError(msg: string, config: Config) {
 export async function startLocal(config: Config = {}): Promise<void> {
   let normalizedConfig: ProfilerConfig;
   try {
-    normalizedConfig = await startHelper(config);
+    normalizedConfig = await initConfigAndMaybeStartHeapProfiler(config);
   } catch (e) {
     logError(`Could not start profiler: ${e}`, config);
     return;

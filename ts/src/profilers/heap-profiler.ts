@@ -40,7 +40,8 @@ export function profile(): perftools.profiles.IProfile {
 
 /**
  * Starts heap profiling. If heap profiling has already been started with
- * different parameters, this re-starts heap profiling with given parameters.
+ * the same parameters, this is a noop. If heap profiler has already been
+ * started with different parameters, this throws an error.
  *
  * @param intervalBytes - average number of bytes between samples.
  * @param stackDepth - maximum stack depth for samples collected.
@@ -50,11 +51,12 @@ export function start(intervalBytes: number, stackDepth: number) {
       heapStackDepth === stackDepth) {
     return;
   }
+  if (enabled) {
+    throw new Error(`Heap profiler is already started  with intervalBytes ${
+        heapIntervalBytes} and stackDepth ${stackDepth}`);
+  }
   heapIntervalBytes = intervalBytes;
   heapStackDepth = stackDepth;
-  if (enabled) {
-    stop();
-  }
   profiler.startSamplingHeapProfiler(heapIntervalBytes, heapStackDepth);
   enabled = true;
 }

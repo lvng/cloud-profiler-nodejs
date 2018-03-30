@@ -19,13 +19,18 @@ import * as extend from 'extend';
 import * as gcpMetadata from 'gcp-metadata';
 import * as sinon from 'sinon';
 
-import {startHelper} from '../src/index';
+import {initConfigAndMaybeStartHeapProfiler} from '../src/index';
+import * as heapProfiler from '../src/profilers/heap-profiler';
 
-describe('startHelper', () => {
+const v8HeapProfiler = require('bindings')('sampling_heap_profiler');
+
+describe('initConfigAndMaybeStartHeapProfiler', () => {
   let savedEnv: NodeJS.ProcessEnv;
   let metadataStub: sinon.SinonStub|undefined;
+  let startStub: sinon.SinonStub;
 
   before(() => {
+    startStub = sinon.stub(v8HeapProfiler, 'startSamplingHeapProfiler');
     savedEnv = process.env;
   });
 
@@ -37,10 +42,13 @@ describe('startHelper', () => {
     if (metadataStub) {
       metadataStub.restore();
     }
+    heapProfiler.stop();
+    startStub.reset();
   });
 
   after(() => {
     process.env = savedEnv;
+    startStub.restore();
   });
 
   const internalConfigParams = {
@@ -67,7 +75,7 @@ describe('startHelper', () => {
       zone: 'zone',
       projectId: 'fake-projectId'
     };
-    const initializedConfig = await startHelper(config);
+    const initializedConfig = await initConfigAndMaybeStartHeapProfiler(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -87,7 +95,7 @@ describe('startHelper', () => {
       zone: 'zone',
       projectId: 'fake-projectId'
     };
-    const initializedConfig = await startHelper(config);
+    const initializedConfig = await initConfigAndMaybeStartHeapProfiler(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -114,7 +122,7 @@ describe('startHelper', () => {
       zone: 'gce-zone',
       projectId: 'projectId'
     };
-    const initializedConfig = await startHelper(config);
+    const initializedConfig = await initConfigAndMaybeStartHeapProfiler(config);
     assert.deepEqual(
         initializedConfig, extend(expConfig, internalConfigParams));
   });
@@ -134,7 +142,8 @@ describe('startHelper', () => {
          disableTime: false,
          projectId: 'fake-projectId',
        };
-       const initializedConfig = await startHelper(config);
+       const initializedConfig =
+           await initConfigAndMaybeStartHeapProfiler(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });
@@ -148,7 +157,7 @@ describe('startHelper', () => {
       disableHeap: true,
       disableTime: true,
     };
-    return startHelper(config)
+    return initConfigAndMaybeStartHeapProfiler(config)
         .then(() => {
           assert.fail('expected error because no service in config');
         })
@@ -170,7 +179,7 @@ describe('startHelper', () => {
       instance: 'instance',
       zone: 'zone'
     };
-    const initializedConfig = await startHelper(config);
+    const initializedConfig = await initConfigAndMaybeStartHeapProfiler(config);
     assert.deepEqual(initializedConfig, extend(config, internalConfigParams));
   });
 
@@ -192,7 +201,7 @@ describe('startHelper', () => {
         internalConfigParams);
     expConfig.baseApiUrl =
         'https://test-cloudprofiler.sandbox.googleapis.com/v2';
-    const initializedConfig = await startHelper(config);
+    const initializedConfig = await initConfigAndMaybeStartHeapProfiler(config);
     assert.deepEqual(initializedConfig, expConfig);
   });
 
@@ -220,7 +229,8 @@ describe('startHelper', () => {
          instance: 'envConfig-instance',
          zone: 'envConfig-zone'
        };
-       const initializedConfig = await startHelper(config);
+       const initializedConfig =
+           await initConfigAndMaybeStartHeapProfiler(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });
@@ -248,7 +258,8 @@ describe('startHelper', () => {
          instance: 'instance',
          zone: 'zone'
        };
-       const initializedConfig = await startHelper(config);
+       const initializedConfig =
+           await initConfigAndMaybeStartHeapProfiler(config);
        assert.deepEqual(
            initializedConfig, extend(config, internalConfigParams));
      });
@@ -272,8 +283,32 @@ describe('startHelper', () => {
        };
 
        const config = {};
-       const initializedConfig = await startHelper(config);
+       const initializedConfig =
+           await initConfigAndMaybeStartHeapProfiler(config);
        assert.deepEqual(
            initializedConfig, extend(expConfig, internalConfigParams));
      });
+  it('should start heap profiler when disableHeap is not set', async () => {
+    const config = {
+      projectId: 'config-projectId',
+      serviceContext: {service: 'config-service'},
+      instance: 'envConfig-instance',
+      zone: 'envConfig-zone',
+    };
+    await initConfigAndMaybeStartHeapProfiler(config);
+    assert.ok(
+        startStub.calledWith(1024 * 512, 64),
+        'expected heap profiler to be started');
+  });
+  it('should start not heap profiler when disableHeap is true', async () => {
+    const config = {
+      projectId: 'config-projectId',
+      serviceContext: {service: 'config-service'},
+      disableHeap: true,
+      instance: 'envConfig-instance',
+      zone: 'envConfig-zone',
+    };
+    await initConfigAndMaybeStartHeapProfiler(config);
+    assert.ok(!startStub.called, 'expected heap profiler to not be started');
+  });
 });

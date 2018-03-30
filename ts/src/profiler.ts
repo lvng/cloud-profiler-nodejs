@@ -258,8 +258,14 @@ export class Profiler extends common.ServiceObject {
     }
     if (!this.config.disableHeap) {
       this.profileTypes.push(ProfileTypes.Heap);
-      heapProfiler.start(
-          this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
+      try {
+        heapProfiler.start(
+            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
+      } catch (e) {
+        this.logger.warn(`Cannot start heap profiler with intervalBytes ${
+            this.config.heapIntervalBytes} and stackDepth ${
+            this.config.heapMaxStackDepth}: ${e}`);
+      }
     }
     this.retryer = new Retryer(
         this.config.initialBackoffMillis, this.config.backoffCapMillis,
