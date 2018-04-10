@@ -112,15 +112,30 @@ async function initConfigMetadata(config: ProfilerConfig):
   return config;
 }
 
-let profiler: Profiler|undefined = undefined;
+const profiler: Profiler|undefined = undefined;
 
 /**
  * Initializes the config, and starts heap profiler if the heap profiler is
- * needed.
+ * needed. Returns a profiler if creation is successful. Otherwise, returns
+ * undefined.
  */
-export async function initConfigAndMaybeStartHeapProfiler(config: Config):
-    Promise<ProfilerConfig> {
-  let profilerConfig = initConfigLocal(config);
+export async function createProfiler(config: Config):
+    Promise<Profiler|undefined> {
+  if (!semver.satisfies(process.version, pjson.engines.node)) {
+    logError(
+        `Could not start profiler: node version ${process.version}` +
+            ` does not satisfies "${pjson.engines.node}"`,
+        config);
+    return undefined;
+  }
+
+  let profilerConfig: ProfilerConfig;
+  try {
+    profilerConfig = initConfigLocal(config);
+  } catch (e) {
+    logError(`Could not start profiler: ${e}`, config);
+    return undefined;
+  }
 
   // Start the heap profiler if profiler config does not indicate heap profiling
   // is disabled. This must be done before any asynchronous calls are made so
@@ -130,7 +145,7 @@ export async function initConfigAndMaybeStartHeapProfiler(config: Config):
         profilerConfig.heapIntervalBytes, profilerConfig.heapMaxStackDepth);
   }
   profilerConfig = await initConfigMetadata(profilerConfig);
-  return profilerConfig;
+  return new Profiler(profilerConfig);
 }
 
 /**
@@ -148,23 +163,10 @@ export async function initConfigAndMaybeStartHeapProfiler(config: Config):
  *
  */
 export async function start(config: Config = {}): Promise<void> {
-  if (!semver.satisfies(process.version, pjson.engines.node)) {
-    logError(
-        `Could not start profiler: node version ${process.version}` +
-            ` does not satisfies "${pjson.engines.node}"`,
-        config);
+  const profiler: Profiler|undefined = await createProfiler(config);
+  if (profiler === undefined) {
     return;
   }
-
-  let normalizedConfig: ProfilerConfig;
-  try {
-    normalizedConfig = await initConfigAndMaybeStartHeapProfiler(config);
-  } catch (e) {
-    logError(`Could not start profiler: ${e}`, config);
-    return;
-  }
-
-  profiler = new Profiler(normalizedConfig);
   profiler.start();
 }
 
@@ -180,15 +182,11 @@ function logError(msg: string, config: Config) {
  * profiles.
  */
 export async function startLocal(config: Config = {}): Promise<void> {
-  let normalizedConfig: ProfilerConfig;
-  try {
-    normalizedConfig = await initConfigAndMaybeStartHeapProfiler(config);
-  } catch (e) {
-    logError(`Could not start profiler: ${e}`, config);
+  const profiler: Profiler|undefined = await createProfiler(config);
+  if (profiler === undefined) {
     return;
   }
 
-  profiler = new Profiler(normalizedConfig);
   while (true) {
     if (!config.disableHeap) {
       const heap = await profiler.profile(

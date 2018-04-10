@@ -205,10 +205,12 @@ function responseToProfileOrError(
 
 /**
  * Polls profiler server for instructions on behalf of a task and
- * collects and uploads profiles as requested
+ * collects and uploads profiles as requested.
+ *
+ * If heap profiling is enabled, the heap profiler must be enabled before heap
+ * profiles can be collected.
  */
 export class Profiler extends common.ServiceObject {
-  private config: ProfilerConfig;
   private logger: Logger;
   private profileLabels: {instance?: string};
   private deployment: Deployment;
@@ -217,6 +219,7 @@ export class Profiler extends common.ServiceObject {
 
   // Public for testing.
   timeProfiler: TimeProfiler|undefined;
+  config: ProfilerConfig;
 
   constructor(config: ProfilerConfig) {
     config = common.util.normalizeArguments(null, config);
@@ -258,14 +261,6 @@ export class Profiler extends common.ServiceObject {
     }
     if (!this.config.disableHeap) {
       this.profileTypes.push(ProfileTypes.Heap);
-      try {
-        heapProfiler.start(
-            this.config.heapIntervalBytes, this.config.heapMaxStackDepth);
-      } catch (e) {
-        this.logger.warn(`Cannot start heap profiler with intervalBytes ${
-            this.config.heapIntervalBytes} and stackDepth ${
-            this.config.heapMaxStackDepth}: ${e}`);
-      }
     }
     this.retryer = new Retryer(
         this.config.initialBackoffMillis, this.config.backoffCapMillis,

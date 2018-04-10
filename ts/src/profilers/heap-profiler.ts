@@ -47,10 +47,6 @@ export function profile(): perftools.profiles.IProfile {
  * @param stackDepth - maximum stack depth for samples collected.
  */
 export function start(intervalBytes: number, stackDepth: number) {
-  if (enabled && heapIntervalBytes === intervalBytes &&
-      heapStackDepth === stackDepth) {
-    return;
-  }
   if (enabled) {
     throw new Error(`Heap profiler is already started  with intervalBytes ${
         heapIntervalBytes} and stackDepth ${stackDepth}`);
