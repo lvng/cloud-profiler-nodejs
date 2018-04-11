@@ -16,6 +16,7 @@
 
 import * as delay from 'delay';
 import * as extend from 'extend';
+import * as fs from 'fs';
 import * as gcpMetadata from 'gcp-metadata';
 import * as path from 'path';
 import {normalize} from 'path';
@@ -72,6 +73,12 @@ function initConfigLocal(config: Config): ProfilerConfig {
   let envSetConfig: Config = {};
   const val = process.env.GCLOUD_PROFILER_CONFIG;
   if (val) {
+    try {
+      const envSetConfigBuf = fs.readFileSync(val);
+      envSetConfig = JSON.parse(envSetConfigBuf.toString());
+    } catch (e) {
+      throw new Error(`Could not parse GCLOUD_PROFILER_CONFIG: ${e}`);
+    }
     envSetConfig = require(path.resolve(val)) as Config;
   }
 
@@ -116,25 +123,21 @@ const profiler: Profiler|undefined = undefined;
 
 /**
  * Initializes the config, and starts heap profiler if the heap profiler is
- * needed. Returns a profiler if creation is successful. Otherwise, returns
- * undefined.
+ * needed. Returns a profiler if creation is successful. Otherwise, throws an
+ * error.
  */
-export async function createProfiler(config: Config):
-    Promise<Profiler|undefined> {
+export async function createProfiler(config: Config): Promise<Profiler> {
   if (!semver.satisfies(process.version, pjson.engines.node)) {
-    logError(
+    throw new Error(
         `Could not start profiler: node version ${process.version}` +
-            ` does not satisfies "${pjson.engines.node}"`,
-        config);
-    return undefined;
+        ` does not satisfies "${pjson.engines.node}"`);
   }
 
   let profilerConfig: ProfilerConfig;
   try {
     profilerConfig = initConfigLocal(config);
   } catch (e) {
-    logError(`Could not start profiler: ${e}`, config);
-    return undefined;
+    throw new Error(`Could not start profiler: ${e}`);
   }
 
   // Start the heap profiler if profiler config does not indicate heap profiling
@@ -163,8 +166,11 @@ export async function createProfiler(config: Config):
  *
  */
 export async function start(config: Config = {}): Promise<void> {
-  const profiler: Profiler|undefined = await createProfiler(config);
-  if (profiler === undefined) {
+  let profiler: Profiler;
+  try {
+    profiler = await createProfiler(config);
+  } catch (e) {
+    logError(`${e}`, config);
     return;
   }
   profiler.start();
@@ -182,8 +188,11 @@ function logError(msg: string, config: Config) {
  * profiles.
  */
 export async function startLocal(config: Config = {}): Promise<void> {
-  const profiler: Profiler|undefined = await createProfiler(config);
-  if (profiler === undefined) {
+  let profiler: Profiler;
+  try {
+    profiler = await createProfiler(config);
+  } catch (e) {
+    logError(`${e}`, config);
     return;
   }
 

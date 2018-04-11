@@ -189,8 +189,15 @@ describe('createProfiler', () => {
       disableHeap: true,
       disableTime: true,
     };
-    const profiler: Profiler|undefined = await createProfiler(config);
-    assert.equal(profiler, undefined, 'profiler should not be created.');
+    createProfiler(config)
+        .then(() => {
+          assert.fail('expected error because no service in config');
+        })
+        .catch((e: Error) => {
+          assert.equal(
+              e.message,
+              'Could not start profiler: Error: Service must be specified in the configuration');
+        });
   });
 
   it('should get have no projectId when no projectId given', async () => {
